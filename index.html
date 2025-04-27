@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f8f8;
+        }
+        h1 {
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        input[type="text"], input[type="number"], textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .item {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .total {
+            font-size: 18px;
+            font-weight: bold;
+            text-align: right;
+        }
+        .currency-select {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Invoice Generator</h1>
+
+        <!-- Company and Customer Details -->
+        <div class="form-group">
+            <input type="text" id="companyName" placeholder="Company Name">
+            <input type="text" id="customerName" placeholder="Customer Name">
+            <textarea id="customerAddress" placeholder="Customer Address"></textarea>
+        </div>
+
+        <!-- Item List -->
+        <div id="itemsContainer"></div>
+
+        <!-- Add Item Button -->
+        <button onclick="addItem()">Add Item</button>
+
+        <!-- Total Amount -->
+        <div class="total">
+            <span>Total: </span><span id="totalAmount">₹ 0</span>
+        </div>
+
+        <!-- Currency Selection -->
+        <div class="currency-select">
+            <label for="currencySelect">Currency: </label>
+            <select id="currencySelect" onchange="updateCurrency()">
+                <option value="₹ INR">₹ INR</option>
+                <option value="$ USD">$ USD</option>
+                <option value="€ EUR">€ EUR</option>
+                <option value="£ GBP">£ GBP</option>
+            </select>
+        </div>
+
+        <!-- PDF Export Button -->
+        <button onclick="downloadPDF()">Download as PDF</button>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        let items = [];
+        let currency = '₹ INR';
+
+        function addItem() {
+            const itemIndex = items.length;
+            const itemContainer = document.createElement('div');
+            itemContainer.classList.add('item');
+            itemContainer.innerHTML = `
+                <input type="text" id="itemName${itemIndex}" placeholder="Item Name">
+                <input type="text" id="hsn${itemIndex}" placeholder="HSN/SAC">
+                <input type="number" id="quantity${itemIndex}" placeholder="Quantity" value="1" oninput="updateItem(${itemIndex})">
+                <input type="number" id="rate${itemIndex}" placeholder="Rate" value="0" oninput="updateItem(${itemIndex})">
+                <div>
+                    <span>Taxable Value: </span><span id="taxableValue${itemIndex}">0</span>
+                    <span> Tax: </span><span id="taxAmount${itemIndex}">0</span>
+                    <span> Total: </span><span id="totalAmountItem${itemIndex}">0</span>
+                </div>
+                <button onclick="removeItem(${itemIndex})">Remove Item</button>
+            `;
+            document.getElementById('itemsContainer').appendChild(itemContainer);
+            items.push(itemContainer);
+        }
+
+        function updateItem(itemIndex) {
+            const quantity = parseFloat(document.getElementById(`quantity${itemIndex}`).value) || 0;
+            const rate = parseFloat(document.getElementById(`rate${itemIndex}`).value) || 0;
+            const taxableValue = quantity * rate;
+            const taxAmount = taxableValue * 0.18; // Assume 18% tax (IGST)
+            const totalAmount = taxableValue + taxAmount;
+
+            document.getElementById(`taxableValue${itemIndex}`).textContent = taxableValue.toFixed(2);
+            document.getElementById(`taxAmount${itemIndex}`).textContent = taxAmount.toFixed(2);
+            document.getElementById(`totalAmountItem${itemIndex}`).textContent = totalAmount.toFixed(2);
+
+            updateTotalAmount();
+        }
+
+        function removeItem(itemIndex) {
+            document.getElementById('itemsContainer').removeChild(items[itemIndex]);
+            items.splice(itemIndex, 1);
+            updateTotalAmount();
+        }
+
+        function updateTotalAmount() {
+            let total = 0;
+            items.forEach((_, index) => {
+                const totalAmount = parseFloat(document.getElementById(`totalAmountItem${index}`).textContent) || 0;
+                total += totalAmount;
+            });
+            document.getElementById('totalAmount').textContent = `${currency} ${total.toFixed(2)}`;
+        }
+
+        function updateCurrency() {
+            currency = document.getElementById('currencySelect').value;
+            updateTotalAmount();
+        }
+
+        function downloadPDF() {
+            const doc = new jsPDF();
+            doc.text('Invoice', 20, 20);
+            doc.text(`Company: ${document.getElementById('companyName').value}`, 20, 30);
+            doc.text(`Customer: ${document.getElementById('customerName').value}`, 20, 40);
+            doc.text(`Address: ${document.getElementById('customerAddress').value}`, 20, 50);
+
+            let yPosition = 60;
+            items.forEach((_, index) => {
+                doc.text(`Item ${index + 1}: ${document.getElementById(`itemName${index}`).value}`, 20, yPosition);
+                yPosition += 10;
+            });
+
+            doc.text(`Total: ${currency} ${document.getElementById('totalAmount').textContent.split(' ')[1]}`, 20, yPosition + 20);
+            doc.save('invoice.pdf');
+        }
+    </script>
+</body>
+</html>
